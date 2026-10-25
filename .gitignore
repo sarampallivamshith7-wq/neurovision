@@ -1,0 +1,40 @@
+# Python virtual environments
+.venv/
+venv/
+env/
+
+# Python cache
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Local EEG data and test images
+data/
+!data/.gitkeep
+
+# Model checkpoints and generated features
+*.pt
+*.pth
+*.ckpt
+*.npz
+
+# Logs and temporary files
+*.log
+logs/
+tmp/
+
+# Environment variables and secrets
+.env
+.env.*
+!.env.example
+
+# Streamlit secrets
+.streamlit/secrets.toml
+
+# OS/editor files
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/

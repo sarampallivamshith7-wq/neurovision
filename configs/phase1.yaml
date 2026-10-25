@@ -1,0 +1,112 @@
+# NeuroVision Phase 1 Configuration: EEG-to-Image Retrieval Baseline (THINGS-EEG2)
+
+# Dataset & Directories
+dataset:
+  bids_root: "C:/things_eeg2/sub-01"
+  stimuli_dir: "C:/things_eeg2/sub-01/stimuli"
+  stimuli_tsv: "C:/things_eeg2/sub-01/stimuli/stimuli.tsv"
+  training_zip: "C:/things_eeg2/sub-01/stimuli/training_images.zip"
+  test_images_dir: "C:/things_eeg2/sub-01/stimuli/test_images"
+  processed_dir: "data/processed"
+  embeddings_dir: "data/embeddings"
+  splits_dir: "data/splits"
+  subject: "sub-01"
+  session: "ses-01"
+  # Optional: train on several subjects/sessions (needed for subject-adversarial learning).
+  # When omitted, `subject` / `session` above are used.
+  subjects: null                  # e.g. ["sub-01", "sub-02"]
+  sessions: null                  # e.g. ["ses-01", "ses-02"]
+
+# EEG Preprocessing
+preprocessing:
+  original_sfreq: 1000.0
+  target_sfreq: 250.0
+  filter_low: 0.5
+  filter_high: 40.0
+  notch_freq: 50.0
+  epoch_start: -0.1          # seconds relative to stimulus onset
+  epoch_end: 0.8             # seconds relative to stimulus onset (total 0.9s = 225 samples @ 250Hz)
+  baseline_start: -0.1       # baseline start
+  baseline_end: 0.0          # baseline end
+  normalization: "trial_zscore" # trial-wise channel z-score: (x - mean) / std
+  expected_channels: 63
+
+# Vision Branch (Frozen Encoders & Projection)
+vision:
+  dinov2_model: "dinov2_vits14"   # 384-dim feature vector
+  clip_model: "ViT-B/32"          # 512-dim feature vector (openai / open_clip)
+  clip_pretrained: "openai"
+  dinov2_dim: 384
+  clip_dim: 512
+  fused_dim: 896                  # 384 + 512
+  image_embed_dim: 512            # shared multimodal embedding dimension
+  cache_batch_size: 64
+
+# EEG Encoder & Projection Head
+eeg_model:
+  encoder_type: "eegnet"          # 'eegnet' or 'conformer'
+  in_channels: 63
+  in_samples: 225                 # 0.9s @ 250Hz
+  temporal_filters: 16
+  temporal_kernel_size: 32        # ~128 ms receptive field @ 250 Hz
+  spatial_depth: 2
+  separable_filters: 32
+  separable_kernel_size: 16
+  dropout: 0.25
+  eeg_rep_dim: 256
+  eeg_embed_dim: 512              # matches image_embed_dim
+  # encoder_type: eegnet | conformer | gnn_conformer
+  conformer:                      # used by 'conformer' and 'gnn_conformer'
+    d_model: 64
+    depth: 3
+    num_heads: 4
+    ff_mult: 4
+    dropout: 0.25
+    temporal_filters: 40          # conformer only
+    temporal_kernel: 25           # conformer only (100 ms @ 250 Hz)
+    pool_kernel: 25               # conformer only
+    pool_stride: 5                # conformer only
+  gnn:                            # used by 'gnn_conformer'
+    conv_type: "gatv2"            # gatv2 | gat | gcn
+    knn: 6                        # electrode graph: k nearest neighbours
+    node_dim: 16
+    layers: 2
+    heads: 4
+    temporal_kernel: 25
+    pool_kernel: 15
+    pool_stride: 5
+    electrodes_tsv: null          # optional BIDS electrodes.tsv (name,x,y,z); else MNE standard_1005
+
+# Training & Contrastive Objective
+training:
+  batch_size: 64
+  learning_rate: 1.0e-4
+  weight_decay: 1.0e-4
+  epochs: 30
+  temperature: 0.07               # InfoNCE temperature
+  symmetric_loss: true            # EEG->Image and Image->EEG
+  patience: 7                     # early stopping patience
+  checkpoint_dir: "checkpoints"
+  num_workers: 0                  # 0 for safe multiprocessing on Windows
+  device: "cpu"                   # 'cuda' if GPU available, else 'cpu'
+  mixed_precision: false
+  device_auto: true               # if true and CUDA is available, use it regardless of `device`
+  val_fraction: 0.05              # fraction of *training images* (not trials) held out for validation
+  monitor: "e2i_mrr"              # validation metric used for early stopping / best checkpoint
+  grad_clip: 1.0
+  run_name: null                  # default: <encoder_type>_<timestamp>
+
+# Subject-adversarial learning (README section 9). Needs >= 2 subjects in the data.
+subject_adversarial:
+  enabled: false
+  weight: 0.1                     # weight of the subject-classification loss
+  lambda_max: 1.0                 # max gradient-reversal strength (DANN ramp-up 0 -> lambda_max)
+
+# Retrieval & Evaluation
+retrieval:
+  top_k: [1, 5, 10]
+  similarity_metric: "cosine"     # Normalized dot product via FAISS IndexFlatIP
+  results_dir: "results"
+
+# General
+seed: 42

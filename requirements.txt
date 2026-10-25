@@ -1,0 +1,9 @@
+streamlit>=1.50
+plotly>=5.20
+torch>=2.2
+torchvision>=0.17
+open_clip_torch>=2.24
+torch-geometric>=2.5   # imported by src/models/eeg_encoder.py even though the Conformer doesn't use it
+numpy
+pandas
+pillow
